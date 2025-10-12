@@ -115,7 +115,7 @@ nameserver 192.168.122.1
 ## No.5
 **SOAL:** “Nama memberi arah,” kata Eonwe. Namai semua tokoh (hostname) sesuai glosarium, eonwe, earendil, elwing, cirdan, elrond, maglor, sirion, tirion, valmar, lindon, vingilot, dan verifikasi bahwa setiap host mengenali dan menggunakan hostname tersebut secara system-wide. Buat setiap domain untuk masing masing node sesuai dengan namanya (contoh: eru.<xxxx>.com) dan assign IP masing-masing juga. Lakukan pengecualian untuk node yang bertanggung jawab atas ns1 dan ns2.
 
-**PENJELASAN:** Assign A record pada setiap node dengan subdomain yang sesuai dengan nama tiap node (eg. lindon jadi lindon.k58.com). Tulis ini pada zonefile di node dns master.
+**PENJELASAN:** Assign A record pada setiap node dengan subdomain yang sesuai dengan nama tiap node (eg. lindon dengan lindon.k58.com). Tulis ini pada zonefile di node dns master.
 
 ```
 ...
@@ -137,4 +137,77 @@ earendil        IN      A       192.240.2.2
 elwing          IN      A       192.240.2.3
 ```
 
+## No.6
+**SOAL:** Lonceng Valmar berdentang mengikuti irama Tirion. Pastikan zone transfer berjalan, Pastikan Valmar (ns2) telah menerima salinan zona terbaru dari Tirion (ns1). Nilai serial SOA di keduanya harus sama
 
+**PENJELASAN:** Setelah merubah zonefile pada nomor sebelum. Jangan lupa ubah serial pada SOA dengan menjadikannya +1 dari angka sebelum. Lalu restartkan daemon. 
+```
+...
+@               IN      SOA     n1.k58.com.     admin.k58.net. (
+                        2       ; Serial
+                        3h      ; Refresh
+...
+```
+
+## No.7
+**SOAL:** Peta kota dan pelabuhan dilukis. Sirion sebagai gerbang, Lindon sebagai web statis, Vingilot sebagai web dinamis. Tambahkan pada zona <xxxx>.com A record untuk sirion.<xxxx>.com (IP Sirion), lindon.<xxxx>.com (IP Lindon), dan
+vingilot.<xxxx>.com (IP Vingilot). Tetapkan CNAME :
+
+- www.<xxxx>.com → sirion.<xxxx>.com ,
+- static.<xxxx>.com → lindon.<xxxx>.com, dan
+- app.<xxxx>.com → vingilot.<xxxx>.com.
+
+Verifikasi dari dua klien berbeda bahwa seluruh hostname tersebut ter-resolve ke tujuan yang benar dan konsisten.
+
+**PENJELASAN:** Tambahkan CNAME record dan incerment serial pada SOA record. Lalu restart daemon.
+```
+...
+@               IN      SOA     n1.k58.com.     admin.k58.net. (
+                        3       ; Serial
+                        3h      ; Refresh
+                        1h      ; Retry
+                        1w      ; Expire
+                        1h      ; Negative caching TTL
+                        )
+...
+www             IN      CNAME   sirion
+static          IN      CNAME   lindon
+app             IN      CNAME   vingilot
+...
+```
+
+## No.8
+**SOAL:** Setiap jejak harus bisa diikuti. Di Tirion (ns1) deklarasikan satu reverse zone untuk segmen DMZ tempat Sirion, Lindon, Vingilot berada. Di Valmar (ns2) tarik reverse zone tersebut sebagai slave, isi PTR untuk ketiga hostname itu agar pencarian balik IP address mengembalikan hostname yang benar, lalu pastikan query reverse untuk
+alamat Sirion, Lindon, Vingilot dijawab authoritative.
+
+**PENJELASAN:** Isi PTR record untuk ketiga hostname pada zonefile yang baru.
+```
+$TTL            3h
+
+@       IN      SOA     n1.k58.com.     admin.k58.net. (
+                        1       ; Serial
+                        3h      ; Refresh
+                        1h      ; Retry
+                        1w      ; Expire
+                        1h      ; Negative caching TTL
+                        )
+
+@       IN      NS      ns1.k58.com.
+2       IN      PTR     sirion.k58.com.
+5       IN      PTR     lindon.k58.com.
+6       IN      PTR     vingilot.k58.com.	
+```
+
+Tambahkan zone pada `named.conf.local` sbg berikut..
+
+```
+...
+zone "2.240.192.in-addr.arpa" {
+        type master;
+        file "/etc/bind/rns1.k58.com";
+
+        notify yes;
+        allow-transfer { 192.240.2.4; };
+        also-notify { 192.240.2.4; };
+};
+```

@@ -72,3 +72,69 @@ ns1             IN      A       192.240.2.3 ; Tirion
 ns2             IN      A       192.240.2.4 ; Valmar
 @               IN      A       192.240.2.2 ; Sirion
 ```
+
+2. Buat master/slave dns server antar Tirion(master) dan Sirion(slave) dengan..
+
+- Menulis `/etc/bind/named.conf.local` di Tirion sbg berikut..
+```
+zone "k58.com" {
+        type master;
+        notify yes;
+        allow-transfer { 192.240.2.4; }; // IP Sirion/slave
+        also-notify { 192.240.2.4; };
+        file "/etc/bind/ns1.k58.com";
+};
+```
+
+- Menulis `/etc/bind/named.conf.options` di Tirion sbg berikut..
+```
+options {
+        directory "/var/cache/bind";
+        listen-on port 53 { localhost; 192.240.0.0/16; };
+        allow-query { localhost; 192.240.0.0/16; };
+        forwarders { 192.168.122.1; };
+};
+```
+
+- Menulis `/etc/bind/named.conf.local` di Sirion sbg berikut..
+```
+zone "k58.com" {
+        type slave;
+        masters { 192.240.2.3; }; // IP Tirion/master
+        file "/var/cache/bind/ns2.k58.com";
+};
+```
+
+3. Menulis `/etc/resolv.conf` seperti berikut pada setiap node..
+```
+nameserver 192.240.2.3
+nameserver 192.240.2.4
+nameserver 192.168.122.1
+```
+
+## No.5
+**SOAL:** “Nama memberi arah,” kata Eonwe. Namai semua tokoh (hostname) sesuai glosarium, eonwe, earendil, elwing, cirdan, elrond, maglor, sirion, tirion, valmar, lindon, vingilot, dan verifikasi bahwa setiap host mengenali dan menggunakan hostname tersebut secara system-wide. Buat setiap domain untuk masing masing node sesuai dengan namanya (contoh: eru.<xxxx>.com) dan assign IP masing-masing juga. Lakukan pengecualian untuk node yang bertanggung jawab atas ns1 dan ns2.
+
+**PENJELASAN:** Assign A record pada setiap node dengan subdomain yang sesuai dengan nama tiap node (eg. lindon jadi lindon.k58.com). Tulis ini pada zonefile di node dns master.
+
+```
+...
+eonwe           IN      A       192.240.1.1
+eonwe           IN      A       192.240.2.1
+eonwe           IN      A       192.240.3.1
+
+cirdan          IN      A       192.240.1.2
+elrond          IN      A       192.240.1.3
+Maglor          IN      A       192.240.1.4
+
+@               IN      A       192.240.2.2
+ns1             IN      A       192.240.2.3
+ns2             IN      A       192.240.2.4
+lindon          IN      A       192.240.2.5
+vingilot        IN      A       192.240.2.6
+
+earendil        IN      A       192.240.2.2
+elwing          IN      A       192.240.2.3
+```
+
+
